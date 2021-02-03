@@ -98,9 +98,9 @@ class DirectionalField():
                 X1 = r*np.cos(self.O_prime[x, y]-pi/2)+X0
                 Y1 = r*np.sin(self.O_prime[x, y]-pi/2)+Y0
                 X2 = X0-r*np.cos(self.O_prime[x, y]-pi/2)
-                Y2 = Y0-r*np.cos(self.O_prime[x, y]-pi/2)
+                Y2 = Y0-r*np.sin(self.O_prime[x, y]-pi/2)
 
-                ax.quiver(X1, Y1, X2, Y2, color = 'blue')
+                ax.quiver(X1, Y1, X2 - X1, Y2 - Y1, color = 'blue')
         #plt.axes().set_aspect('equal')
         plt.show()
         np.pi
