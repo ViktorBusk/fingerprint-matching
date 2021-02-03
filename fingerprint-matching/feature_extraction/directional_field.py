@@ -2,44 +2,50 @@ from PIL import Image
 from scipy.ndimage import sobel, gaussian_filter
 import numpy as np
 import matplotlib.pyplot as plt
-import math
-
-class Block():
-
-
-    pass
+from .normalize import normalize
+from math import pi
+import cv2 
 
 class DirectionalField():
     def __init__(self, fingerprint: Image): 
         # 2D image array
-        self._np_array_2D = np.array(fingerprint) #248 x 338
+        self.I = np.array(fingerprint) #248 x 338
         # Blocks
         self.W = 12 # Block size (W X W)
-        self.blocks_x = self._np_array_2D.shape[1] // self.W # W = 12, Width = 248 -> 20
-        self.blocks_y = self._np_array_2D.shape[0] // self.W # W = 12, Height = 338 -> 28
+        self.blocks_x = self.I.shape[1] // self.W # W = 12, Width = 248 -> 20
+        self.blocks_y = self.I.shape[0] // self.W # W = 12, Height = 338 -> 28
         # Field
-        self.field_orientation = np.empty([self.blocks_y, self.blocks_y], dtype = float)
-        self.diff_x = self._np_array_2D.shape[1] - self.blocks_x * self.W # W = 12 -> 8 (248 - 20 * 12)
-        self.diff_y = self._np_array_2D.shape[0] - self.blocks_y * self.W # W = 12 -> 2 (338 - 28 * 12)
+        self.diff_x = self.I.shape[1] - self.blocks_x * self.W # W = 12 -> 8 (248 - 20 * 12)
+        self.diff_y = self.I.shape[0] - self.blocks_y * self.W # W = 12 -> 2 (338 - 28 * 12)
         self.margin_left = self.diff_x // 2 # W = 12 -> 4 (px)
         self.margin_top = self.diff_y // 2 # W = 12 -> 1 (px)
-        # Gradient
-        self._G, self._Gx, self._Gy = None, None, None
 
-        # Get directionalField
+        self.O = np.zeros([self.blocks_y, self.blocks_y], dtype = float)
+        self.Vx = np.zeros([self.blocks_y, self.blocks_y], dtype = float)
+        self.Vy = np.zeros([self.blocks_y, self.blocks_y], dtype = float)
+        self.Phi_x = np.zeros([self.blocks_y, self.blocks_y], dtype = float)
+        self.Phi_y = np.zeros([self.blocks_y, self.blocks_y], dtype = float)
+        self.O_prime = np.zeros([self.blocks_y, self.blocks_y], dtype = float)
+
+        # Gradient
+        self.Gx, self.Gy = None, None
+     
+        #-----------------Get directionalField-----------------------
+        self.I = normalize(self.I, 100, 100)
         self._calculate_gradient()
         self._calculate_local_block_orientation()
         self._low_pass_filter()
-        self.plot()
 
+        self.plot()
+        #img = Image.fromarray(self.I).show()
+        #img.show()
 
     def _calculate_gradient(self):
         '''
         Compute gradients for each pixel using Sobel operator (used for edge detection).
         '''
-        self._Gx = sobel(self._np_array_2D, 0)  # horizontal derivative
-        self._Gy = sobel(self._np_array_2D, 1)  # vertical derivative
-        self._G = np.hypot(self._Gx, self._Gy)  # magnitude
+        self.Gx = sobel(self.I, 0)  # horizontal derivative
+        self.Gy = sobel(self.I, 1)  # vertical derivative
 
     def _calculate_local_block_orientation(self):
         '''
@@ -47,61 +53,58 @@ class DirectionalField():
         '''
         for i in range(self.blocks_x):
             for j in range(self.blocks_y):
-                tan_inverse_input = 0
                 for u in range(i*self.W + self.margin_left, (i+1)*self.W + self.margin_left):
                     for v in range(j*self.W + self.margin_top, (j+1)*self.W + self.margin_top):
-                        if self._Gx[v, u]**2 - self._Gy[v, u]**2 != 0: # denominator in expression can't be 0
-                            tan_inverse_input += (2*self._Gx[v, u]*self._Gy[v, u] / (self._Gx[v, u]**2 - self._Gy[v, u]**2))
-            
-                self.field_orientation[j, i] = (1/2) * np.arctan(tan_inverse_input) # θ(i, j))
+                        self.Vx[j, i] += (2*self.Gx[v, u]*self.Gy[v, u])
+                        self.Vy[j, i] += (self.Gx[v, u]**2 - self.Gy[v, u]**2)
+                        
+                if self.Vx[j, i] != 0: # denominator can't be zero, arctan of 0 is 0
+                    self.O[j, i] = (1/2) * np.arctan(self.Vy[j, i] / self.Vx[j, i]) # θ(i, j))
 
-    def plot(self):
-        fig, ax = plt.subplots()
-        ax.imshow(self._np_array_2D, extent=[0, self.blocks_x, 0, self.blocks_y], cmap = 'gray')
-        #ax.axis('off')
+    def _low_pass_filter(self):
+        # Remove loops later
         for i in range(self.blocks_x):
             for j in range(self.blocks_y):
-                ax.quiver(i, j, np.cos(math.pi/2 + 2 * self.field_orientation[j, i]), np.sin(math.pi/2 + 2 * self.field_orientation[j, i]), color = 'blue')
+                self.Phi_x[j, i] = np.cos(2*self.O[j, i]) #np.hypot(self.Vx[j, i], self.Vy[j, i]) * np.cos(2*self.O[j, i])
+                self.Phi_y[j, i] = np.sin(2*self.O[j, i]) #np.hypot(self.Vx[j, i], self.Vy[j, i]) * np.sin(2*self.O[j, i])
+
+        # map array from -1, 1 to 0 to 255
+        self.Phi_x = np.uint8(255 * (self.Phi_x + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
+        self.Phi_y = np.uint8(255 * (self.Phi_y + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
+
+        # Applay noise reduction filter (low pass filter)
+        self.Phi_x = cv2.medianBlur(self.Phi_x, 5)
+        self.Phi_y = cv2.medianBlur(self.Phi_y, 5)
+
+        # map bakc from 0, 255 to -1 to 1
+        self.Phi_x = (self.Phi_x / 255) * 2 - 1
+        self.Phi_y = (self.Phi_y / 255) * 2 - 1
+
+        self.O_prime = (1/2)*np.arctan(self.Phi_y / self.Phi_x)
+   
+    def plot(self):
+        fig, ax = plt.subplots()
+        ax.imshow(self.I, cmap = 'gray')
+        #ax.axis('off')
+        for x in range(self.blocks_x):
+            for y in range(self.blocks_y):
+                i = x * self.W + self.W//2 + self.margin_left
+                j = y * self.W + self.W//2 + self.margin_top
+               
+                X0 = i + self.W/2    
+                Y0 = j + self.W/2
+                r = self.W/2
+
+                X1 = r*np.cos(self.O_prime[x, y]-pi/2)+X0
+                Y1 = r*np.sin(self.O_prime[x, y]-pi/2)+Y0
+                X2 = X0-r*np.cos(self.O_prime[x, y]-pi/2)
+                Y2 = Y0-r*np.cos(self.O_prime[x, y]-pi/2)
+
+                ax.quiver(X1, Y1, X2, Y2, color = 'blue')
         #plt.axes().set_aspect('equal')
         plt.show()
         np.pi
 
-    def _low_pass_filter(self):
-        #self.field_orientation *= 2
-        self.field_orientation = gaussian_filter(self.field_orientation, 2)
-        #W_Fi = 5
-        #for i in range(self.blocks_x):
-            #for j in range(self.blocks_y):
-                #self.field_orientation[j, i] = np.cos(2 * self.field_orientation[j, i])  # Φx(i, j)
-                #self.field_orientation[j, i] = np.sin(2 * self.field_orientation[j, i])  # Φy(i, j)
-                #self.field_orientation[j, i] =  gaussian_filter(self.field_orientation[j, i], 2)
-
-    def plot_gradient(self):
-        if self._G is None: self._calculate_gradient() # calculate gradient if it's uninitialized
-        
-        normalized_G = self._G # copy gradient
-        normalized_G *= 255.0 / np.max(normalized_G)  # normalize (Q&D)
-        normalized_G = np.round(normalized_G).astype(np.uint8) # round and convert to 8 bit integer
-        
-        # plotting
-        plt.close("all")
-        plt.figure()
-        plt.suptitle("Gradient, and its components along each axis")
-        ax = plt.subplot(131)
-        ax.axis("off")
-        ax.imshow(normalized_G, cmap='gray')
-        ax.set_title("G (Normalized)")
-
-        ax = plt.subplot(132)
-        ax.axis("off")
-        ax.imshow(self._Gx, cmap='gray')
-        ax.set_title("Gx")
-
-        ax = plt.subplot(133)
-        ax.axis("off")
-        ax.imshow(self._Gy, cmap='gray')
-        ax.set_title("Gy")
-        plt.show()
 
       
         
