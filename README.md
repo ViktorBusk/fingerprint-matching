@@ -11,7 +11,7 @@
 *Minutiae* - details of the ridge-valley structures **(RIDGE ENDINGS, BIFURCATIONS)** \
 *Directional field* is used for **enhancement** of the fingerprint \
 *Directional field* + *The singular points* is used for **classification** \
-*Minutiae* is used for **matching** \
+*Minutiae* is used for **matching**
 
 ### Steps
 
