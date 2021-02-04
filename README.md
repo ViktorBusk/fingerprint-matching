@@ -16,7 +16,7 @@
 1. - [x] *Directional field* estimation
 
 <div align="center">
-  <img src="https://github.com/ViktorBusk/fingerprint-matching/blob/main/recourses/orientation_field_beta_1_0_0.png" img align="left" height="40%" width="40%">
+  <img src="https://github.com/ViktorBusk/fingerprint-matching/blob/main/recourses/orientation_field_beta_1_0_0.png" height="40%" width="40%">
 </div>
 
 2. - [ ] *Singular point* Extraction
