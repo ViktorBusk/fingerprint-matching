@@ -1,4 +1,4 @@
-# fingerprint-matching (UNFINISHED)
+# fingerprint-matching
 fingerprint-matching is a Python library for matching fingerprints.
 
 ### Fingerprint Features
