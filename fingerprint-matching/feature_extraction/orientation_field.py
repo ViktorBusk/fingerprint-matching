@@ -7,12 +7,12 @@ from cv2 import medianBlur as median_blur
 from math import pi
 
 class OrientationField():
-    def __init__(self, fingerprint: Image): 
+    def __init__(self, fingerprint: Image, block_size: int): 
         # 2D image array
         self.__fingerprint = fingerprint #248 x 338
         self.__I = np.array(self.__fingerprint) 
         # Blocks
-        self.W = 12 # Block size (W X W)
+        self.W = block_size # Block size (W X W)
         self.blocks_x = self.__I.shape[1] // self.W # W = 12, Width = 248 -> 20
         self.blocks_y = self.__I.shape[0] // self.W # W = 12, Height = 338 -> 28
         diff_x = self.__I.shape[1] - self.blocks_x * self.W # W = 12 -> 8 (248 - 20 * 12)
@@ -71,11 +71,11 @@ class OrientationField():
         Compute local orientation of the blocks using least square estimate.
         '''
         # Allocate memory for the arrays
-        self.__O = np.zeros([self.blocks_y, self.blocks_y], dtype = np.float32)
-        self.__Vx = np.zeros([self.blocks_y, self.blocks_y], dtype = np.float32)
-        self.__Vy = np.zeros([self.blocks_y, self.blocks_y], dtype = np.float32)
-        self.__Phi_x = np.zeros([self.blocks_y, self.blocks_y], dtype = np.float32)
-        self.__Phi_y = np.zeros([self.blocks_y, self.blocks_y], dtype = np.float32)
+        self.__O = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        self.__Vx = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        self.__Vy = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        self.__Phi_x = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        self.__Phi_y = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
 
         # Loop over each pixel in imgae (block wise)
         for i in range(self.blocks_x):
@@ -94,9 +94,6 @@ class OrientationField():
         '''
         Applay noise reduction filter, removes salt and pepper like noise (low pass filter)
         '''
-        # Allocate memory for array
-        self.__O_prime = np.zeros([self.blocks_y, self.blocks_y], dtype = np.float32)
-
         # map array from -1, 1 to 0 to 255 (values are centered around 0, -pi/2 to pi/2)
         self.__Phi_x = np.uint8(255 * (self.__Phi_x + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
         self.__Phi_y = np.uint8(255 * (self.__Phi_y + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
