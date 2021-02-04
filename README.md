@@ -1,4 +1,5 @@
-# Fingerprint Matching
+# fingerprint-matching
+fingerprint-matching is a Python library for matching fingerprints.
 
 ### Fingerprint Features
 *Ridges* - where the skin has a higher profile than its surroundings **(BLACK)** \
