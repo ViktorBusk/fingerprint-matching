@@ -1,4 +1,4 @@
-# fingerprint-matching
+# Fingerprint Matching
 
 ### Fingerprint Features
 *Ridges* - where the skin has a higher profile than its surroundings **(BLACK)** \
