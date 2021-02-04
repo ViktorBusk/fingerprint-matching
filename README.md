@@ -15,7 +15,7 @@
 #### 1. Feature Extraction
 1. - [x] *Directional field* estimation
 
-![alt text](https://github.com/ViktorBusk/fingerprint-matching/blob/main/recourses/orientation_field_beta_1_0_0.png?raw=true)
+![alt text](https://github.com/ViktorBusk/fingerprint-matching/blob/main/recourses/orientation_field_beta_1_0_0.png?raw=true){:height="50%" width="50%"}
 
 2. - [ ] *Singular point* Extraction
 
