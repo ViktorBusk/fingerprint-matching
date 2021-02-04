@@ -1,6 +1,6 @@
 from pathlib import Path
-from image import Image
 from feature_extraction import OrientationField
+from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 
