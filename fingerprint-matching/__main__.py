@@ -1,6 +1,6 @@
 from pathlib import Path
 from image import Image
-from feature_extraction import DirectionalField
+from feature_extraction import OrientationField
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -9,5 +9,5 @@ if __name__ == '__main__':
     
     # Create image
     fingerprint_image = Image.open(image_path)
-    directional_field = DirectionalField(fingerprint_image)
-    
+    orientation_field = OrientationField(fingerprint_image)
+    orientation_field.show()
