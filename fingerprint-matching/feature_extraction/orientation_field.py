@@ -134,8 +134,7 @@ class OrientationField():
 
                 x_dir = np.cos(self.__O_prime[j, i])
                 y_dir = np.sin(self.__O_prime[j, i])
-
-                ax.quiver(x, y, x_dir, y_dir, color = 'blue', headwidth=1, headlength = 0)
+                ax.quiver(x, y, x_dir, y_dir, color = 'blue' , headwidth=1, headlength = 0, scale = 40)
         plt.show()
 
 
