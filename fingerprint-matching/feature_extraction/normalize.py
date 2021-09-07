@@ -21,4 +21,3 @@ def normalize(I, M0: int, VAR0: int):
             else:
                 G[j, i] = (M0 - np.sqrt(VAR0 * (I[j, i] - M)**2 / VAR))
     return G
-   

@@ -4,110 +4,116 @@ import numpy as np
 import matplotlib.pyplot as plt
 from .normalize import normalize
 from cv2 import medianBlur as median_blur
-from math import pi
 
 class OrientationField():
     def __init__(self, fingerprint: Image, block_size: int): 
         # 2D image array
-        self.__fingerprint = fingerprint #248 x 338
-        self.__I = np.array(self.__fingerprint) 
+        self._fingerprint = fingerprint 
+        self._I = np.array(self._fingerprint) 
         # Blocks
-        self.W = block_size # Block size (W X W)
-        self.blocks_x = self.__I.shape[1] // self.W # W = 12, Width = 248 -> 20
-        self.blocks_y = self.__I.shape[0] // self.W # W = 12, Height = 338 -> 28
-        diff_x = self.__I.shape[1] - self.blocks_x * self.W # W = 12 -> 8 (248 - 20 * 12)
-        diff_y = self.__I.shape[0] - self.blocks_y * self.W # W = 12 -> 2 (338 - 28 * 12)
-        self.__margin_left = diff_x // 2 # W = 12 -> 4 (px)
-        self.__margin_top = diff_y // 2 # W = 12 -> 1 (px)
+        self.W = block_size 
+        self.blocks_x = self._I.shape[1] // self.W 
+        self.blocks_y = self._I.shape[0] // self.W 
+        # Margin
+        self._margin_left, self._margin_top = self._get_margin()
         # Field
-        self.__O, self.__O_prime = None, None
-        self.__Vx, self.__Vy = None, None
-        self.__Phi_x, self.__Phi_y = None, None
+        self._O_prime = None
+        self._Phi_x, self._Phi_y = None, None
         # Gradient
-        self.__G, self.__Gx, self.__Gy = None, None, None
+        self._G, self._Gx, self._Gy = None, None, None
 
     @property
     def orientation_field(self):
-        if self.__O_prime is None: self.calculate()
-        return self.__O_prime
-
-    @property
-    def gradient(self):
-        if self.__G is None:
-            self.__normalize()
-            self.__calculate_gradient()
-        return self.__G
+        if self._O_prime is None: 
+            self.calculate()
+        return self._O_prime
 
     @property
     def gradient_x(self):
-        if self.__G is None:
-            self.__normalize()
-            self.__calculate_gradient()
-        return self.__Gx
+        if self._Gx is None:
+            self._normalize()
+            self._calculate_gradient()
+        return self._Gx
     
     @property
     def gradient_y(self):
-        if self.__G is None:
-            self.__normalize()
-            self.__calculate_gradient()
-        return self.__Gy
+        if self._Gy is None:
+            self._normalize()
+            self._calculate_gradient()
+        return self._Gy
+
+    @property
+    def gradient(self):
+        if self._G is None:
+            self._normalize()
+            self._calculate_gradient()
+        return self._G
+
+    def _get_margin(self):
+        diff_x = self._I.shape[1] - self.blocks_x * self.W 
+        diff_y = self._I.shape[0] - self.blocks_y * self.W 
+        margin_left = diff_x // 2
+        margin_top = diff_y // 2
+        return margin_left, margin_top
 
     def _normalize(self):
         '''
         Normalize grayscale image before gradient computation
         '''
-        self.__I = normalize(self.__I, 100, 100)
+        self._I = normalize(self._I, 100, 100)
 
     def _calculate_gradient(self):
         '''
         Compute gradients for each pixel using Sobel operator (used for edge detection).
         '''
-        self.__Gx = sobel(self.__I, 0)  # horizontal derivative
-        self.__Gy = sobel(self.__I, 1)  # vertical derivative
-        self.__G = np.hypot(self.__Gx, self.__Gy)
+        self._Gx = sobel(self._I, 0)  # horizontal derivative
+        self._Gy = sobel(self._I, 1)  # vertical derivative
+        self._G = np.hypot(self._Gx, self._Gy)
 
     def _calculate_local_block_orientation(self):
         '''
         Compute local orientation of the blocks using least square estimate.
         '''
-        # Allocate memory for the arrays
-        self.__O = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
-        self.__Vx = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
-        self.__Vy = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
-        self.__Phi_x = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
-        self.__Phi_y = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        # Initialize arrays 
+        Vx = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        Vy = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        O = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        self._Phi_x = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
+        self._Phi_y = np.zeros([self.blocks_y, self.blocks_x], dtype = np.float32)
 
         # Loop over each pixel in imgae (block wise)
         for i in range(self.blocks_x):
             for j in range(self.blocks_y):
-                for u in range(i*self.W + self.__margin_left, (i+1)*self.W + self.__margin_left):
-                    for v in range(j*self.W + self.__margin_top, (j+1)*self.W + self.__margin_top):
-                        self.__Vx[j, i] += self.__Gx[v, u]**2 - self.__Gy[v, u]**2
-                        self.__Vy[j, i] += 2*self.__Gx[v, u]*self.__Gy[v, u]
+                for u in range(i*self.W + self._margin_left, (i+1)*self.W + self._margin_left):
+                    for v in range(j*self.W + self._margin_top, (j+1)*self.W + self._margin_top):
+                        Vx[j, i] += self.gradient_x[v, u]**2 - self.gradient_y[v, u]**2
+                        Vy[j, i] += 2 * self.gradient_x[v, u] * self.gradient_y[v, u]
                         
-                self.__O[j, i] = (1/2)*np.arctan2(self.__Vy[j, i], self.__Vx[j, i]) # θ(i, j))
+                # OrientationField
+                O[j, i] = (1/2)*np.arctan2(Vy[j, i], Vx[j, i]) # θ(i, j))
+
                 # Convert into a continuous vector field
-                self.__Phi_x[j, i] = np.cos(2*self.__O[j, i])
-                self.__Phi_y[j, i] = np.sin(2*self.__O[j, i])
+                self._Phi_x[j, i] = np.cos(2*O[j, i])
+                self._Phi_y[j, i] = np.sin(2*O[j, i])
 
     def _low_pass_filter(self):
         '''
         Applay noise reduction filter, removes salt and pepper like noise (low pass filter)
         '''
         # map array from -1, 1 to 0 to 255 (values are centered around 0, -pi/2 to pi/2)
-        self.__Phi_x = np.uint8(255 * (self.__Phi_x + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
-        self.__Phi_y = np.uint8(255 * (self.__Phi_y + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
+        self._Phi_x = np.uint8(255 * (self._Phi_x + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
+        self._Phi_y = np.uint8(255 * (self._Phi_y + 1) / 2) # WARNING: Looses precision on decimal if number is uneven i.e 255/2 = 127.5 -> 127
 
         # Applay noise reduction filter
-        self.__Phi_x = median_blur(self.__Phi_x, 5)
-        self.__Phi_y = median_blur(self.__Phi_y, 5)
+        self._Phi_x = median_blur(self._Phi_x, 5)
+        self._Phi_y = median_blur(self._Phi_y, 5)
 
         # map back from 0, 255 to -1 to 1
-        self.__Phi_x = np.float32((self.__Phi_x / 255) * 2 - 1)
-        self.__Phi_y = np.float32((self.__Phi_y / 255) * 2 - 1)
+        self._Phi_x = np.float32((self._Phi_x / 255) * 2 - 1)
+        self._Phi_y = np.float32((self._Phi_y / 255) * 2 - 1)
         
         # Get filtered orientation field
-        self.__O_prime = (1/2)*np.arctan2(self.__Phi_y, self.__Phi_x)
+        self._O_prime = (1/2)*np.arctan2(self._Phi_y, self._Phi_x)
 
     def calculate(self):
         self._normalize()
@@ -116,27 +122,19 @@ class OrientationField():
         self._low_pass_filter()
 
     def show_gradient(self):
-        if self.__G is None:
-            self._normalize()
-            self._calculate_gradient()
-        Image.fromarray(self.__G).show()
+        Image.fromarray(self.gradient).show()
 
     def show(self):
-        if self.__O_prime is None: self.calculate() # Calculate field before drawing anything
-        
         fig, ax = plt.subplots()
-        ax.imshow(self.__fingerprint, cmap = 'gray')
+        ax.imshow(self._fingerprint, cmap = 'gray')
 
         for i in range(self.blocks_x):
             for j in range(self.blocks_y):
-                x = i * self.W + self.W//2 + self.__margin_left
-                y = j * self.W + self.W//2 + self.__margin_top
+                x = i * self.W + self.W//2 + self._margin_left
+                y = j * self.W + self.W//2 + self._margin_top
 
-                x_dir = np.cos(self.__O_prime[j, i])
-                y_dir = np.sin(self.__O_prime[j, i])
+                x_dir = np.cos(self.orientation_field[j, i])
+                y_dir = np.sin(self.orientation_field[j, i])
+
                 ax.quiver(x, y, x_dir, y_dir, color = 'blue' , headwidth=1, headlength = 0, scale = 40)
         plt.show()
-
-
-      
-        
